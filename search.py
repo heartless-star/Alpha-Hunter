@@ -361,7 +361,7 @@ class search_factor():
             while num_compensate > 0:  # 单次构造的循环
 
                 long = random.randint(limit_lon,self.long)  # 单次公式随机长度
-                print(len(all_gen))
+                # print(len(all_gen))
                 if long == 1:  # 长度为1时别无选择，从X中挑一个得了,此时得看看all里面有没有还没被生成的单字
                     all_gen_key = set(all_gen.keys())
                     remain = [item for item in num if item not in all_gen_key]
@@ -406,7 +406,7 @@ class search_factor():
                                     fuck = f"{function_allow[funnc]}({values[0]},{values[1]})"
                                     result = f"({result},{fuck})"
                                     syd = random.choice(double_func)  # 送一个二元符顺手的事
-                                    result = f"{syd}{result}"
+                                    result = f"{function_allow[syd]}{result}"
 
                                     numm -= 4
                             else: #取到一元算子的情况，位置多的很，直接拼
@@ -417,9 +417,10 @@ class search_factor():
                                     numm -= 2
                                 else: #内容不为空时,要么拼一个二元加值在结尾，要么全部套一个一元符号，不管了
                                     fuck = f"{function_allow[funnc]}({values})"
-                                    result = f"{result},{fuck}"
+                                    syd = random.choice(double_func) # 送一个二元符顺手的事
+                                    result = f"{function_allow[syd]}({result},{fuck})"
 
-                                    numm -= 2
+                                    numm -= 3
                         elif numm == 2: #到这个分支里result肯定不为空，可以整体拼一个三元也可以套一个一元
                             ops = ["single", "double"]
                             cho = random.choices(ops, weights=use_single_func_weight, k=1)[0]
@@ -473,12 +474,30 @@ class search_factor():
                         # all_gen[result] = self.parse_formula(result)
                         all_gen[result] = {}
                         num_compensate -= 1
+        # print(all_gen)
         return all_gen
+
+    def eva_gen(self,all_d,X,df_meta): #生成的数据进行评估
+        all_dict = all_d
+        formula = list(all_dict.keys())
+        for i in formula:
+            # print(i)
+            if all_dict[i] == {}:
+                factor = self.parse_formula(i)
+                # 再计算
+                factor_value = self.evaluate_tree(factor, X)
+                # 再评估
+                ic_result = self.calc_ic_icir(factor_value, df_meta, )
+                all_dict[i] = ic_result
+        return all_dict
+
+    def mutate(self,all_dict):
+        pass
 
     def fit(self,X:ndarray,Y:ndarray,date):
         '''
         处理数据接受，抽取，计算，测试的过程函数
-        :return:
+        :return: dict
         '''
         self.x = X
         self.y = Y
@@ -492,23 +511,30 @@ class search_factor():
 
         all_dict = self.creat_gen_in_batch(X_long=X.shape[1])  #生成种群
 
-        formula = list(all_dict.keys())
-        for i in formula:
-            # 先解析
-            factor = self.parse_formula(i)
-            #再计算
-            factor_value =  self.evaluate_tree(factor, X)
-            #再评估
-            ic_result = self.calc_ic_icir(factor_value,df_meta,)
-            all_dict[i] = ic_result
-        print(all_dict)
-        print("过滤中，IC<0.02将被筛掉")
+        all_dict = self.eva_gen(all_dict,X,df_meta)
+        # print(all_dict)
+        for i in range(self.gen):
+            print(f"数量：{len(all_dict)}，过滤中，IC<0.02将被筛掉")
+            all_key = list(all_dict.keys())
+            for i in all_key:
+                if all_dict[i]['ic_mean'] < 0.02:
+                    del all_dict[i]
+            print(f"数量：{len(all_dict)},补充中。。。")
+            all_dict = self.creat_gen_in_batch(X_long=X.shape[1],all_dict=all_dict)
+            all_dict = self.eva_gen(all_dict, X, df_meta)
+            # print(all_dict)
+
+        print(f"数量：{len(all_dict)}，过滤中，IC<0.02将被筛掉")
         all_key = list(all_dict.keys())
         for i in all_key:
             if all_dict[i]['ic_mean'] < 0.02:
                 del all_dict[i]
+        print(f"数量：{len(all_dict)}")
         print(all_dict)
+
     def multi_worker(self): # 多进程
         pass
 
 
+# test = search_factor(2, 200, ('add','sub'),6,3,0.2,1,True)
+# print(test.creat_gen_in_batch(4))
