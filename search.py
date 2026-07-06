@@ -471,8 +471,7 @@ class Alpha_Hunter:
 
     def eva_gen(self, all_d, X, df_meta):  # 生成的数据进行评估
         all_dict = all_d
-        formula = list(all_dict.keys())
-        for i in formula:
+        for i in all_dict:
             # print(i)
             if all_dict[i] == {}:
                 factor = self.parse_formula(i)
@@ -595,8 +594,11 @@ class Alpha_Hunter:
             icir_total = 0
             icir_count = 0
             for i in all_dict:
-                ic = all_dict[i]['ic_mean']
-                icir_val = all_dict[i]['icir']
+                try:
+                    ic = all_dict[i].get('ic_mean', np.nan)
+                    icir_val = all_dict[i].get('icir', np.nan)
+                except AttributeError:
+                    continue
                 if not np.isnan(ic):  # 跳过无效的NaN值
                     total += ic
                     valid_count += 1
@@ -606,8 +608,11 @@ class Alpha_Hunter:
 
             ic_average = total / valid_count if valid_count > 0 else np.nan
             icir_average = icir_total / icir_count if icir_count > 0 else np.nan
+
             print(f'IC平均数:{ic_average}')
             print(f"ICIR平均数:{icir_average}")
+            if valid_count == 0:
+                print("⚠️  警告: 所有因子IC值均为NaN，请检查输入数据中因子值或目标收益率是否正常")
 
         #   print(f"有效因子数:{valid_count}, IC总和:{total:.3f}, ICIR总和:{icir_total:.3f}")
 
@@ -644,6 +649,57 @@ class Alpha_Hunter:
         all_dict = self.eva_gen(all_dict, X, df_meta)
         calculatt(all_dict)
         print(all_dict)
+        return all_dict
 
-# test = search_factor(2, 200, ('add','sub'),6,3,0.2,1,True)
-# print(test.creat_gen_in_batch(4))
+    def valid(self, all_dict, X, Y, date):
+
+        def calculatt(all_dict):
+            total = 0
+            valid_count = 0
+            icir_total = 0
+            icir_count = 0
+            for i in all_dict:
+                try:
+                    ic = all_dict[i].get('ic_mean', np.nan)
+                    icir_val = all_dict[i].get('icir', np.nan)
+                except AttributeError:
+                    continue
+                if not np.isnan(ic):  # 跳过无效的NaN值
+                    total += ic
+                    valid_count += 1
+                if not np.isnan(icir_val):
+                    icir_total += icir_val
+                    icir_count += 1
+
+            ic_average = total / valid_count if valid_count > 0 else np.nan
+            icir_average = icir_total / icir_count if icir_count > 0 else np.nan
+
+            print(f'IC平均数:{ic_average}')
+            print(f"ICIR平均数:{icir_average}")
+            if valid_count == 0:
+                print("⚠️  警告: 所有因子IC值均为NaN，请检查输入数据中因子值或目标收益率是否正常")
+
+        fuc = {k: dict(v) for k, v in all_dict.items()}  # 深拷贝防止后续修改影响
+        print("挖掘集数据表现")
+        calculatt(fuc)
+        print("====================")
+        # 和fit一样，但是只评估all_dict在验证集上的表现
+        assert len(X) == len(Y) and len(X) == len(date), f"X({len(X)}), Y({len(Y)}), date({len(date)}) 长度不一致"
+        if len(X) == 0:
+            print("❌ 错误: 验证集数据为空，请检查验证集的日期范围或抽样逻辑")
+            return
+        if len(X) < 10:
+            print(f"⚠️  警告: 验证集仅 {len(X)} 行，calc_ic_icir 要求至少10行")
+        # 拼接df_meta DF表
+        df_meta = pd.DataFrame({
+            'date_col': date,
+            'target_col': Y
+        })
+        # 然后计算因子值传入计算
+        for i in list(all_dict.keys()):
+            tree = self.parse_formula(i)
+            factor_values = self.evaluate_tree(tree, X)
+            ret = self.calc_ic_icir(factor_values, df_meta)
+            all_dict[i] = ret
+        print("验证集表现：")
+        calculatt(all_dict)
