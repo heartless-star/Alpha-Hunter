@@ -213,7 +213,7 @@ for formula, metrics in factor_pool.items():
 
 ## 贡献
 
-Alpha Hunter 是一个个人项目，欢迎任何形式的建议、Issue 和 PR。
+Alpha Hunter 是一个个人项目，欢迎任何形式的建议、Issue 和 PR。作者将会长期维护该项目
 
 ## 许可证
 
