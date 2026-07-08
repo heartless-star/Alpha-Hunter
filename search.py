@@ -7,7 +7,6 @@
 # ██████  ██   ██  ██████  ██    ██  ██   ██  ██    ██   ███
 #
 ##################################  coding by Zachary  ########
-from ftplib import all_errors
 
 # -*- coding: utf-8 -*-
 
@@ -16,12 +15,14 @@ from ftplib import all_errors
 # @time:2026/7/1
 # @author:Zachary
 
-
-import numpy as np
 import random
 import pandas as pd
 import re
 from numpy import ndarray
+import json
+import numpy as np
+from datetime import datetime
+import os
 
 
 class Alpha_Hunter:
@@ -51,6 +52,56 @@ class Alpha_Hunter:
         self.ic_icir_weight = IC_ICIR_weight
         self.mutate_rate = mutate_rate
         self.mutate_point_rate = mutate_point_rate
+
+    def save_factor_pool(self, factor_dict, filepath=None, save_with_timestamp=True):
+        """
+        将因子池保存为 JSON 文件（自动处理 numpy 类型）
+
+        参数:
+            factor_pool: dict, 你的 fit() 方法返回的字典
+            filepath: str, 保存路径（可选）
+            save_with_timestamp: bool, 是否在文件名后加时间戳（防止覆盖）
+
+            ---------by Deepseek
+
+        """
+        # 1. 处理文件路径
+        if filepath is None:
+            filename = "factor_pool.json"
+        else:
+            filename = filepath
+
+        # 如果开启时间戳，在文件名后插入时间
+        if save_with_timestamp:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            name, ext = os.path.splitext(filename)
+            filename = f"{name}_{timestamp}{ext}"
+
+        # 2. 定义转换函数（核心：解决 numpy 无法序列化的问题）
+        def convert_to_serializable(obj):
+            """递归处理 numpy 类型，转换为 Python 原生类型"""
+            if isinstance(obj, np.integer):
+                return int(obj)
+            elif isinstance(obj, np.floating):
+                return float(obj)
+            elif isinstance(obj, np.ndarray):
+                return obj.tolist()
+            elif isinstance(obj, dict):
+                return {key: convert_to_serializable(value) for key, value in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_to_serializable(item) for item in obj]
+            else:
+                return obj
+
+        # 3. 转换数据
+        cleaned_pool = convert_to_serializable(factor_dict)
+
+        # 4. 保存文件（ensure_ascii=False 保证中文能正常显示）
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(cleaned_pool, f, ensure_ascii=False, indent=4)
+
+        print(f"因子池已成功保存至: {filename}")
+        return filename
 
     def calc_ic_icir(self, factor_values, df_meta, target_col='target_col', date_col='date_col'):
         """
